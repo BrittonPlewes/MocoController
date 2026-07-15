@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Jog Control</title>
+<style>
+  :root{
+    --bg:#0b0b0d;
+    --panel:#0e0e10;
+    --panel-border:#232327;
+    --readout-bg:#000000;
+    --btn:#2b2b30;
+    --btn-hi:#38383f;
+    --btn-border:#3d3d44;
+    --btn-active-bg:#111112;
+    --text-dim:#8a8a90;
+    --text-mid:#c7c7cc;
+    --stop:#ff3b30;
+
+    --x:#ff3b30;
+    --y:#33ff5e;
+    --z:#4d7fff;
+    --a:#e8d000;
+    --b:#2fd8e8;
+
+    --accent:#5b9bd5;
+    --section-label:#d9a53c;
+  }
+
+  * { box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+  html,body{
+    margin:0; padding:0;
+    background:var(--bg);
+    color:var(--text-mid);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-user-select:none;
+    user-select:none;
+    overscroll-behavior:none;
+  }
+
+  .app{
+    max-width:440px;
+    margin:0 auto;
+    padding:10px 10px 28px;
+  }
+
+  /* ── Axis readouts ───────────────────────── */
+  .readout{
+    background:var(--readout-bg);
+    border:1px solid var(--panel-border);
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    padding:5px 12px;
+    margin-bottom:5px;
+    gap:8px;
+    position:relative;
+    overflow:hidden;
+  }
+
+  .axis-letter{
+    font-size:28px;
+    font-weight:800;
+    width:32px;
+    text-align:center;
+    text-shadow:0 0 10px currentColor;
+  }
+
+  .axis-value{
+    flex:1;
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+    font-weight:700;
+    line-height:1;
+    letter-spacing:-1px;
+    text-shadow:0 0 14px currentColor;
+    display:flex;
+    align-items:baseline;
+    justify-content:flex-end;
+    gap:3px;
+  }
+  .axis-value .num{ font-size:36px; }
+  .axis-value .unit{ font-size:11px; font-weight:600; opacity:0.85; }
+
+  .row-x .axis-letter, .row-x .axis-value{ color:var(--x); }
+  .row-y .axis-letter, .row-y .axis-value{ color:var(--y); }
+  .row-z .axis-letter, .row-z .axis-value{ color:var(--z); }
+  .row-a .axis-letter, .row-a .axis-value{ color:var(--a); }
+  .row-b .axis-letter, .row-b .axis-value{ color:var(--b); }
+
+  /* ── Controls section ────────────────────── */
+  .section-label{
+    font-size:12px;
+    color:var(--section-label);
+    margin:16px 2px 6px;
+    letter-spacing:0.3px;
+    font-weight:600;
+  }
+
+  .controls-panel{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:10px;
+    display:grid;
+    grid-template-columns:1fr 108px;
+    gap:10px;
+  }
+
+  .jog-col{ display:flex; flex-direction:column; gap:8px; }
+
+  .jog-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:6px;
+  }
+  .jog-btn{
+    aspect-ratio:1;
+    background:var(--btn);
+    border:1px solid var(--btn-border);
+    border-radius:8px;
+    color:var(--text-mid);
+    font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .jog-btn:active{ background:var(--btn-active-bg); transform:scale(0.95); }
+  .jog-btn.empty{ background:transparent; border:none; }
+  .jog-btn.stop{
+    color:var(--stop);
+    font-size:26px;
+  }
+  .jog-btn.stop:active{ background:var(--btn-active-bg); }
+
+  .ab-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+  }
+  .ab-btn{
+    background:var(--btn);
+    border:1px solid var(--btn-border);
+    border-radius:8px;
+    color:var(--text-mid);
+    font-size:14px;
+    font-weight:600;
+    padding:10px 0;
+  }
+  .ab-btn:active{ background:var(--btn-active-bg); transform:scale(0.97); }
+  .ab-btn.a{ color:var(--a); }
+  .ab-btn.b{ color:var(--b); }
+
+  .slider-block{ margin-top:4px; }
+  .slider-label{
+    display:flex;
+    justify-content:space-between;
+    font-size:11px;
+    color:var(--text-dim);
+    margin-bottom:4px;
+  }
+  .slider-label .val{
+    background:#000;
+    border:1px solid var(--btn-border);
+    border-radius:4px;
+    padding:1px 8px;
+    color:var(--text-mid);
+    font-variant-numeric:tabular-nums;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    width:100%;
+    height:24px;
+    background:transparent;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:4px;
+    background:var(--btn-border);
+    border-radius:2px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px; height:16px;
+    border-radius:50%;
+    background:#d4d4d8;
+    margin-top:-6px;
+    border:1px solid #555;
+  }
+
+  .groupbox{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .groupbox-label{
+    font-size:11px;
+    color:var(--text-dim);
+    margin-bottom:-2px;
+  }
+  .gb-btn{
+    background:var(--btn);
+    border:1px solid var(--btn-border);
+    border-radius:8px;
+    color:var(--accent);
+    font-size:13px;
+    padding:12px 0;
+    font-weight:500;
+  }
+  .gb-btn:active{ background:var(--btn-active-bg); transform:scale(0.97); }
+
+  .full-slider{
+    grid-column:1 / -1;
+    margin-top:4px;
+  }
+
+  .conn-dot{
+    position:absolute;
+    top:6px; right:8px;
+    width:7px; height:7px;
+    border-radius:50%;
+    background:#2ecc40;
+    box-shadow:0 0 6px #2ecc40;
+  }
+
+  .fullscreen-btn{
+    position:fixed;
+    top:10px; right:10px;
+    width:34px; height:34px;
+    background:var(--btn);
+    border:1px solid var(--btn-border);
+    border-radius:8px;
+    color:var(--text-mid);
+    font-size:15px;
+    display:flex; align-items:center; justify-content:center;
+    padding:0;
+    z-index:10;
+    opacity:0.85;
+  }
+  .fullscreen-btn:active{ background:var(--btn-active-bg); transform:scale(0.94); }
+
+  .status-dot{
+    position:fixed;
+    top:19px; right:52px;
+    width:9px; height:9px;
+    border-radius:50%;
+    background:#555;
+    box-shadow:0 0 6px transparent;
+    z-index:10;
+    transition:background 0.2s, box-shadow 0.2s;
+  }
+  .status-dot.connected{
+    background:#2ecc40;
+    box-shadow:0 0 6px #2ecc40;
+  }
+  .status-dot.disconnected{
+    background:var(--stop);
+    box-shadow:0 0 6px var(--stop);
+  }
+</style>
+</head>
+<body>
+
+<div class="status-dot" id="statusDot" title="Connection status"></div>
+<button class="fullscreen-btn" id="fullscreenBtn" data-vib title="Toggle fullscreen">⛶</button>
+
+<div class="app">
+
+  <div class="readout row-x">
+    <div class="axis-letter">X</div>
+    <div class="axis-value"><span class="num" id="numX">0.00</span><span class="unit">deg</span></div>
+  </div>
+
+  <div class="readout row-y">
+    <div class="axis-letter">Y</div>
+    <div class="axis-value"><span class="num" id="numY">0.00</span><span class="unit">deg</span></div>
+  </div>
+
+  <div class="readout row-z">
+    <div class="axis-letter">Z</div>
+    <div class="axis-value"><span class="num" id="numZ">0.00</span><span class="unit">deg</span></div>
+  </div>
+
+  <div class="readout row-a">
+    <div class="axis-letter">A</div>
+    <div class="axis-value"><span class="num" id="numA">0.00</span><span class="unit">mm</span></div>
+  </div>
+
+  <div class="readout row-b">
+    <div class="axis-letter">B</div>
+    <div class="axis-value"><span class="num" id="numB">0.00</span><span class="unit">mm</span></div>
+  </div>
+
+  <div class="section-label">Controls</div>
+
+  <div class="controls-panel">
+    <div class="jog-col" id="jogPanel">
+      <div class="jog-grid">
+        <button class="jog-btn" data-vib title="X-">↺</button>
+        <button class="jog-btn" data-vib title="Y+">↑</button>
+        <button class="jog-btn" data-vib title="X+">↻</button>
+        <button class="jog-btn" data-vib title="Z-">←</button>
+        <button class="jog-btn stop" data-vib="stop" title="Stop">●</button>
+        <button class="jog-btn" data-vib title="Z+">→</button>
+        <div class="jog-btn empty"></div>
+        <button class="jog-btn" data-vib title="Y-">↓</button>
+        <div class="jog-btn empty"></div>
+      </div>
+
+      <div class="ab-grid">
+        <button class="ab-btn a" data-vib>A+</button>
+        <button class="ab-btn b" data-vib>B+</button>
+        <button class="ab-btn a" data-vib>A-</button>
+        <button class="ab-btn b" data-vib>B-</button>
+      </div>
+
+      <div class="slider-block">
+        <div class="slider-label"><span>Jog amount (deg)</span><span class="val" id="jogAmountVal">10°</span></div>
+        <input type="range" id="jogAmount" min="0" max="45" value="10" step="1">
+      </div>
+    </div>
+
+    <div class="groupbox">
+      <div class="groupbox-label">GroupBox</div>
+      <button class="gb-btn" data-vib>Shutter</button>
+      <button class="gb-btn" data-vib>Home</button>
+      <button class="gb-btn" data-vib>Zero All</button>
+    </div>
+
+    <div class="full-slider">
+      <div class="slider-label"><span>Jog Speed (deg/s)</span><span class="val" id="jogSpeedVal">2.50</span></div>
+      <input type="range" id="jogSpeed" min="0" max="20" value="2.5" step="0.05">
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  // ── Haptic feedback ──────────────────────────
+  // navigator.vibrate is supported on Android Chrome/Firefox but NOT on iOS
+  // Safari (Apple has never implemented the Vibration API, even in home-
+  // screen web apps). If you're testing on iPhone, this will never buzz.
+  //
+  // On Android, vibrate() must run inside a real user-activation event.
+  // 'click' is the safest choice — some browsers don't treat 'pointerdown'
+  // as sufficient activation for vibrate(), which can silently no-op it.
+  //
+  // It also gets blocked if this page is opened inside an embedded viewer
+  // or in-app browser (e.g. a preview pane, or a link opened inside
+  // Messages/Instagram/etc.) rather than as a normal tab in Chrome — those
+  // often sandbox the page without vibrate permission. Open the file
+  // directly in Chrome for Android to test it properly.
+  function buzz(pattern) {
+    if (!('vibrate' in navigator)) return;
+    try {
+      navigator.vibrate(pattern);
+    } catch (e) {
+      console.warn('vibrate() failed:', e);
+    }
+  }
+
+  document.querySelectorAll('[data-vib]').forEach(el => {
+    el.addEventListener('click', () => {
+      const kind = el.getAttribute('data-vib');
+      if (kind === 'stop') {
+        buzz([30, 40, 30]); // distinct double-buzz for the stop/e-stop button
+      } else {
+        buzz(15); // short crisp tap for normal buttons
+      }
+    });
+  });
+
+  // ── WebSocket connection to the PyQt backend ──
+  // Connecting with no URL targets the same host that served this page,
+  // which is exactly what we want: the phone loads this page from the
+  // PyQt app's local IP, and the socket connects right back to it.
+  const socket = io();
+  const statusDot = document.getElementById('statusDot');
+
+  socket.on('connect', () => {
+    statusDot.classList.remove('disconnected');
+    statusDot.classList.add('connected');
+  });
+  socket.on('disconnect', () => {
+    statusDot.classList.remove('connected');
+    statusDot.classList.add('disconnected');
+  });
+  // Give it a moment before showing "disconnected" red, so the initial
+  // handshake on page load doesn't flash red before connecting.
+  setTimeout(() => {
+    if (!socket.connected) statusDot.classList.add('disconnected');
+  }, 1500);
+
+  // Live axis readouts pushed from the PyQt app.
+  // Expected payload: { x: 12.34, y: 0, z: -4.5, a: 1.2, b: 0 }
+  const numEls = { x: document.getElementById('numX'), y: document.getElementById('numY'),
+                    z: document.getElementById('numZ'), a: document.getElementById('numA'),
+                    b: document.getElementById('numB') };
+  socket.on('axis_update', (data) => {
+    for (const axis in data) {
+      const el = numEls[axis];
+      if (el != null && data[axis] !== undefined) {
+        el.textContent = Number(data[axis]).toFixed(2);
+      }
+    }
+  });
+
+  // ── Sliders ───────────────────────────────────
+  const jogAmount = document.getElementById('jogAmount');
+  const jogAmountVal = document.getElementById('jogAmountVal');
+  jogAmount.addEventListener('input', () => {
+    jogAmountVal.textContent = jogAmount.value + '°';
+  });
+  jogAmount.addEventListener('change', () => {
+    socket.emit('settings', { amount: parseFloat(jogAmount.value), speed: parseFloat(jogSpeed.value) });
+  });
+
+  const jogSpeed = document.getElementById('jogSpeed');
+  const jogSpeedVal = document.getElementById('jogSpeedVal');
+  jogSpeed.addEventListener('input', () => {
+    jogSpeedVal.textContent = parseFloat(jogSpeed.value).toFixed(2);
+  });
+  jogSpeed.addEventListener('change', () => {
+    socket.emit('settings', { amount: parseFloat(jogAmount.value), speed: parseFloat(jogSpeed.value) });
+  });
+
+  // ── Fullscreen toggle ─────────────────────────
+  // Standard Fullscreen API, with the vendor-prefixed fallbacks older
+  // WebKit/Android browsers still need. NOTE: iOS Safari does not support
+  // requestFullscreen() on arbitrary elements at all (only <video>), so this
+  // button won't do anything there. On iPhone, the real way to get a
+  // full-bleed view is to open this page, tap Share → "Add to Home Screen",
+  // then launch it from that icon — home-screen web apps run without the
+  // browser chrome automatically.
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+  }
+
+  function enterFullscreen() {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) req.call(el);
+  }
+
+  function exitFullscreen() {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    if (exit) exit.call(document);
+  }
+
+  fullscreenBtn.addEventListener('click', () => {
+    if (isFullscreen()) {
+      exitFullscreen();
+    } else {
+      enterFullscreen();
+    }
+  });
+
+  ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange'].forEach(evt => {
+    document.addEventListener(evt, () => {
+      fullscreenBtn.textContent = isFullscreen() ? '⤡' : '⛶';
+    });
+  });
+
+  // ── Button press → backend commands ──────────
+  // Jog buttons: title is the axis command, e.g. "X-", "Y+", or "Stop".
+  document.querySelectorAll('.jog-btn:not(.empty)').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cmd = btn.title;
+      if (cmd === 'Stop') {
+        socket.emit('estop');
+      } else {
+        socket.emit('jog', {
+          axis: cmd[0],                    // 'X' | 'Y' | 'Z'
+          dir: cmd[1],                     // '+' | '-'
+          amount: parseFloat(jogAmount.value),
+          speed: parseFloat(jogSpeed.value)
+        });
+      }
+    });
+  });
+
+  // A/B buttons: text is e.g. "A+", "B-".
+  document.querySelectorAll('.ab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const label = btn.textContent.trim();
+      socket.emit('jog', {
+        axis: label[0],                    // 'A' | 'B'
+        dir: label[1],                     // '+' | '-'
+        amount: parseFloat(jogAmount.value),
+        speed: parseFloat(jogSpeed.value)
+      });
+    });
+  });
+
+  // GroupBox buttons: Shutter / Home / Zero All.
+  document.querySelectorAll('.gb-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      socket.emit('groupbox', { action: btn.textContent.trim() });
+    });
+  });
+</script>
+
+</body>
+</html>
